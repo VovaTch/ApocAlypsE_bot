@@ -14,19 +14,47 @@ class State(Enum):
 
 class TrainCommand:
     def __init__(
-        self, bot: BotAI, unit_type_id: id, building_structure: Unit | None = None
+        self,
+        bot: BotAI,
+        unit_type_id: id,
+        producer: tuple[Unit, Unit] | Unit | None = None,
     ) -> None:
         self._state = State.PENDING
         self._requested_unit_type = unit_type_id
+        self._bot = bot
 
-        match unit_type_id:
-            case id.INTERCEPTOR:
-                raise NotImplementedError(
-                    "Interceptors are not trained directly, TODO: write logic"
+        # Archon error handling
+        if unit_type_id == id.ARCHON:
+            if producer is not None and len(producer) != 2:
+                raise ValueError(
+                    "Archon can only be produced from 2 high \ dark templars"
                 )
-            case id.ARCHON:
-                raise NotImplementedError(
-                    "Archons are not trained directly, TODO: write logic"
-                )
-            case _:
-                self._building_structure = building_structure
+        else:
+            if producer is not None and len(producer) > 1:
+                raise ValueError("A unit can only be produced from one building")
+
+        self._producer: Unit = producer
+
+    @property
+    def state(self) -> State:
+        return self._state
+
+    @property
+    def request_unit_type(self) -> id:
+        return self._requested_unit_type
+
+    def get_producer(self) -> Unit | None:
+        if self._producer is None:
+            return self._bot.units(
+                PRODUCTION_MAPPING[self._requested_unit_type]
+            ).ready.random
+        elif self._producer.is_active:
+            return None
+        else:
+            return self._producer
+
+    def set_state_running(self) -> None:
+        self._state = State.RUNNING
+
+    def set_state_done(self) -> None:
+        self._state = State.DONE
